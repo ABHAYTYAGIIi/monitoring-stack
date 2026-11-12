@@ -81,6 +81,3 @@ bloomBuilder:
   replicas: 0
 bloomGateway:
   replicas: 0
-
-minio:
-  enabled: false
