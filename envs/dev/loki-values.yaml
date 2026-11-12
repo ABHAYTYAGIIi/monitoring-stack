@@ -1,0 +1,23 @@
+loki:
+  compactor:
+    delete_request_store: azure
+    retention_enabled: true
+  limits_config:
+    ingestion_burst_size_mb: 75
+    ingestion_rate_mb: 50
+    retention_period: 168h
+  querier:
+    max_concurrent: 10
+  storage:
+    bucketNames:
+      admin: dev-admin
+      chunks: dev-chunks
+      ruler: dev-ruler
+querier:
+  resources:
+    limits:
+      cpu: 500m
+      memory: 1Gi
+    requests:
+      cpu: 200m
+      memory: 512Mi

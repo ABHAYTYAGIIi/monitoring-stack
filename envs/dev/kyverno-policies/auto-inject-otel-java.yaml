@@ -1,0 +1,54 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: auto-inject-otel-java
+spec:
+  admission: true
+  background: false
+  emitWarning: false
+  rules:
+  - match:
+      any:
+      - resources:
+          kinds:
+          - Deployment
+          namespaces:
+          - dev
+    mutate:
+      patchStrategicMerge:
+        spec:
+          template:
+            metadata:
+              annotations:
+                instrumentation.opentelemetry.io/inject-java: java-instrumentation
+                prometheus.io/path: /metrics
+                prometheus.io/port: "9464"
+                prometheus.io/scrape: "true"
+    name: inject-java-instrumentation-globally
+    preconditions:
+      any:
+      - key: '{{ request.object.metadata.name }}'
+        operator: AnyIn
+        value:
+        - analytics-api
+        - scheduler-service
+        - scheduler-listener
+        - scheduler-notification-listener
+        - decision-engine
+        - decision-engine-app
+        - ehr-service
+        - content-service-deployment
+        - patient-management-deployment
+        - write-audit-listener-deployment
+        - task-management-consumer-deployment
+        - task-management-outreach-consumer-deployment
+        - task-management-rest-deployment
+        - engagement-listener-deployment
+        - engagement-rest-deployment
+        - organisation-management-deployment
+        - notification-service-deployment
+        - voice-patient-auth-deployment
+        - consent-management-deployment
+        - npi-service-deployment
+    skipBackgroundRequests: true
+  validationFailureAction: Audit

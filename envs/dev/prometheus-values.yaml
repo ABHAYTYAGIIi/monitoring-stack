@@ -1,0 +1,98 @@
+alertmanagers:
+  - static_configs:
+    - targets:
+      - alertmanager.monitoring.svc.cluster.local:9093
+
+serverFiles:
+  alerting_rules.yml:
+    groups:
+    - name: aks-dev-cluster.rules
+      rules:
+      - alert: KubeNodeNotReady
+        expr: kube_node_status_condition{condition="Ready",status="true"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Node {{ $labels.node }} is not ready"
+          description: "Node {{ $labels.node }} has been unready for more than 5 minutes."
+      - alert: NodeCpuHighUsage
+        expr: (100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)) > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on Node {{ $labels.instance }}"
+          description: "Node {{ $labels.instance }} CPU usage has been above 85% for the last 5 minutes."
+      - alert: NodeMemoryHighUsage
+        expr: ((node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100) > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Memory usage on Node {{ $labels.instance }}"
+          description: "Node {{ $labels.instance }} memory usage has been above 85% for the last 5 minutes."
+
+    - name: aks-dev-pods.rules
+      rules:
+      - alert: KubePodCrashLooping
+        expr: kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"} == 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is crash looping"
+          description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} (container {{ $labels.container }}) is in CrashLoopBackOff state."
+      - alert: KubePodNotReady
+        expr: kube_pod_status_phase{phase=~"Pending|Unknown"} == 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is not ready"
+          description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} has been in a non-ready state for longer than 10 minutes."
+      - alert: KubePodOOMKilled
+        expr: kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} was OOMKilled"
+          description: "Container {{ $labels.container }} in Pod {{ $labels.namespace }}/{{ $labels.pod }} has been OOMKilled."
+
+    - name: prometheus-self-monitoring.rules
+      rules:
+      - alert: PrometheusTargetDown
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prometheus Target Down"
+          description: "Target {{ $labels.instance }} of job {{ $labels.job }} has been down for more than 5 minutes."
+      - alert: PrometheusZeroTargets
+        expr: count(up{job=~"kubernetes-service-endpoints|kubernetes-pods"}) == 0 or absent(up{job="kubernetes-service-endpoints"})
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prometheus has zero active scraping targets"
+          description: "Prometheus is not finding any active scraping targets for application pods or service endpoints. The telemetry pipeline may be broken."
+      - alert: PrometheusConfigReloadFailed
+        expr: prometheus_config_last_reload_successful == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prometheus Configuration Reload Failed"
+          description: "Prometheus failed to reload its configuration. A malformed config was likely applied to the cluster."
+
+server:
+  baseURL: "https://dev-tools.smartslot.ai/prometheus"
+  retention: "15d"
+  retentionSize: "14GB"
+  persistentVolume:
+    size: 16Gi
+  extraArgs:
+    web.route-prefix: "/"
+    web.enable-remote-write-receiver: ""

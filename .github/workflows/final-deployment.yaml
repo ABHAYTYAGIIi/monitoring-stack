@@ -1,0 +1,135 @@
+name: Deploy AKS Monitoring Stack
+
+on:
+  workflow_dispatch:
+    inputs:
+      use_self_hosted:
+        description: 'Use self-hosted runner? (Check to use sha-agent-dev-01)'
+        type: boolean
+        default: false
+      environment:
+        description: Select environment
+        required: true
+        type: choice
+        options:
+          - dev
+          - stage
+          - prod
+
+jobs:
+  monitoring:
+    environment: ${{ github.event.inputs.environment }}
+    runs-on: ${{ inputs.use_self_hosted && fromJSON('["self-hosted", "sha-agent-dev-01"]') || 'ubuntu-latest' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials \
+            --resource-group ${{ secrets.AKS_RESOURCE_GROUP }} \
+            --name ${{ secrets.AKS_NAME }} \
+            --overwrite-existing
+
+      - name: Ensure monitoring namespace
+        run: |
+          kubectl get ns monitoring || kubectl create ns monitoring
+
+      - name: Deploy Loki Distributed
+        run: |
+          helm upgrade --install loki \
+            loki/loki  \
+            -f loki/loki/distributed-values.yaml \
+            -f envs/${{ github.event.inputs.environment }}/loki-values.yaml \
+            --set loki.storage.azure.accountName=${{ secrets.LOKI_STORAGE_NAME }} \
+            --set loki.storage.azure.accountKey=${{ secrets.LOKI_STORAGE_KEY }} \
+            -n monitoring
+
+
+      - name: Deploy OpenTelemetry Collector
+        run: |
+          helm upgrade --install otel-collector \
+            otel/opentelemetry-collector \
+            -n monitoring \
+            -f otel/opentelemetry-collector/values.yaml \
+            -f envs/${{ github.event.inputs.environment }}/otel-values.yaml
+
+      - name: Apply OpenTelemetry Instrumentation
+        run: |
+          kubectl apply -f envs/${{ github.event.inputs.environment }}/instrumentation.yaml
+
+
+      - name: Deploy Node Exporter
+        run: |
+          helm upgrade --install prometheus-node-exporter \
+            prometheus/prometheus-node-exporter \
+            -n monitoring
+            
+      - name: Create Alertmanager Teams Webhook Secret
+        run: |
+          kubectl create secret generic alertmanager-teams-webhook \
+            --from-literal=webhook_url="${{ secrets.MSTEAMS_WEBHOOK_URL }}" \
+            -n monitoring --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy Alert Manager
+        run: |
+          helm upgrade --install alertmanager \
+            prometheus/alertmanager \
+            -f envs/${{ github.event.inputs.environment }}/alertmanager-values.yaml \
+            -n monitoring
+
+      - name: Deploy Kube State Metrics
+        run: |
+          helm upgrade --install kube-state-metrics \
+            prometheus/kube-state-metrics \
+            -n monitoring
+
+      - name: Deploy Prometheus Pushgateway
+        run: |
+          helm upgrade --install prometheus-pushgateway \
+            prometheus/prometheus-pushgateway \
+            -n monitoring
+
+      - name: Deploy Prometheus Server
+        run: |
+          helm upgrade --install prometheus \
+            prometheus/prometheus \
+            -f envs/${{ github.event.inputs.environment }}/prometheus-values.yaml \
+            -n monitoring
+
+      - name: Deploy Grafana
+        run: |
+          helm upgrade --install grafana \
+            grafana/grafana \
+            -f envs/${{ github.event.inputs.environment }}/grafana-values.yaml \
+            -n monitoring
+
+      - name: Deploy Tempo
+        run: |
+          helm upgrade --install tempo \
+            tempo \
+            -f envs/${{ github.event.inputs.environment }}/tempo-values.yaml \
+            --set tempo.storage.trace.azure.storage_account_name=${{ secrets.TEMPO_STORAGE_NAME }} \
+            --set tempo.storage.trace.azure.storage_account_key=${{ secrets.TEMPO_STORAGE_KEY }} \
+            -n monitoring
+
+      - name: Deploy Kyverno
+        run: |
+          helm repo add kyverno https://kyverno.github.io/kyverno/
+          helm upgrade --install kyverno \
+            kyverno/kyverno \
+            -n kyverno --create-namespace --version 3.8.2 \
+            -f envs/${{ github.event.inputs.environment }}/kyverno-values.yaml
+      
+      - name: Apply Kyverno Auto-Inject Policies
+        run: |
+          kubectl apply -f envs/${{ github.event.inputs.environment }}/kyverno-policies/
