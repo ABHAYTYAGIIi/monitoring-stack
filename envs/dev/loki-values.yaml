@@ -1,4 +1,22 @@
+deploymentMode: Monolithic
+
 loki:
+  commonConfig:
+    replication_factor: 1
+  schemaConfig:
+    configs:
+      - from: "2024-04-01"
+        store: tsdb
+        object_store: azure
+        schema: v13
+        index:
+          prefix: loki_index_
+          period: 24h
+  storage:
+    type: azure
+    bucketNames:
+      chunks: dev-chunks
+      ruler: dev-ruler
   compactor:
     delete_request_store: azure
     retention_enabled: true
@@ -7,17 +25,57 @@ loki:
     ingestion_rate_mb: 50
     retention_period: 168h
   querier:
-    max_concurrent: 10
-  storage:
-    bucketNames:
-      admin: dev-admin
-      chunks: dev-chunks
-      ruler: dev-ruler
-querier:
+    max_concurrent: 4
+
+singleBinary:
+  replicas: 1
   resources:
-    limits:
+    requests:
       cpu: 500m
       memory: 1Gi
-    requests:
-      cpu: 200m
-      memory: 512Mi
+    limits:
+      cpu: 1500m
+      memory: 2Gi
+  extraEnv:
+    - name: GOMEMLIMIT
+      value: 1700MiB
+  persistence:
+    enabled: true
+    size: 10Gi
+
+# Disable separately deployed microservices.
+backend:
+  replicas: 0
+read:
+  replicas: 0
+write:
+  replicas: 0
+ingester:
+  replicas: 0
+querier:
+  replicas: 0
+queryFrontend:
+  replicas: 0
+queryScheduler:
+  replicas: 0
+distributor:
+  replicas: 0
+compactor:
+  replicas: 0
+indexGateway:
+  replicas: 0
+bloomPlanner:
+  replicas: 0
+bloomBuilder:
+  replicas: 0
+bloomGateway:
+  replicas: 0
+
+# Avoid additional cache pods in this small AKS cluster.
+chunksCache:
+  enabled: false
+resultsCache:
+  enabled: false
+
+minio:
+  enabled: false
