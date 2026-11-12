@@ -106,6 +106,24 @@ jobs:
     environment: ${{ github.event.inputs.environment }}
     runs-on: ${{ inputs.use_self_hosted && fromJSON('["self-hosted", "sha-agent-dev-01"]') || 'ubuntu-latest' }}
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials \
+            --resource-group ${{ secrets.AKS_RESOURCE_GROUP }} \
+            --name ${{ secrets.AKS_NAME }} \
+            --overwrite-existing
+
       - run: |
           # Delete the configmap completely so Helm can recreate it from scratch without any SSA field ownership conflicts
           kubectl delete configmap loki -n monitoring --ignore-not-found
@@ -119,9 +137,28 @@ jobs:
 
   otel:
     needs: setup
+    environment: ${{ github.event.inputs.environment }}
     if: ${{ github.event.inputs.install_otel == 'true' }}
     runs-on: [self-hosted, sha-agent-dev-01]
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials \
+            --resource-group ${{ secrets.AKS_RESOURCE_GROUP }} \
+            --name ${{ secrets.AKS_NAME }} \
+            --overwrite-existing
+
       - run: |
           helm upgrade --install otel-collector \
             otel/opentelemetry-collector \
@@ -131,9 +168,28 @@ jobs:
 
   otel_operator:
     needs: setup
+    environment: ${{ github.event.inputs.environment }}
     if: ${{ github.event.inputs.install_otel_operator == 'true' }}
     runs-on: [self-hosted, sha-agent-dev-01]
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials \
+            --resource-group ${{ secrets.AKS_RESOURCE_GROUP }} \
+            --name ${{ secrets.AKS_NAME }} \
+            --overwrite-existing
+
       - run: |
           helm upgrade --install otel-operator \
             otel/otel-operator \
@@ -146,9 +202,28 @@ jobs:
 
   node-exporter:
     needs: setup
+    environment: ${{ github.event.inputs.environment }}
     if: ${{ github.event.inputs.install_node_exporter == 'true' }}
     runs-on: [self-hosted, sha-agent-dev-01]
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials \
+            --resource-group ${{ secrets.AKS_RESOURCE_GROUP }} \
+            --name ${{ secrets.AKS_NAME }} \
+            --overwrite-existing
+
       - run: |
           helm upgrade --install prometheus-node-exporter \
             prometheus/prometheus-node-exporter \
@@ -160,6 +235,24 @@ jobs:
     environment: ${{ github.event.inputs.environment }}
     runs-on: [self-hosted, sha-agent-dev-01]
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials \
+            --resource-group ${{ secrets.AKS_RESOURCE_GROUP }} \
+            --name ${{ secrets.AKS_NAME }} \
+            --overwrite-existing
+
       - name: Create Alertmanager Teams Webhook Secret
         run: |
           kubectl create secret generic alertmanager-teams-webhook \
@@ -174,9 +267,28 @@ jobs:
 
   kube-state-metrics:
     needs: setup
+    environment: ${{ github.event.inputs.environment }}
     if: ${{ github.event.inputs.install_kube_state_metrics == 'true' }}
     runs-on: [self-hosted, sha-agent-dev-01]
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials \
+            --resource-group ${{ secrets.AKS_RESOURCE_GROUP }} \
+            --name ${{ secrets.AKS_NAME }} \
+            --overwrite-existing
+
       - run: |
           helm upgrade --install kube-state-metrics \
             prometheus/kube-state-metrics \
@@ -184,9 +296,28 @@ jobs:
 
   pushgateway:
     needs: setup
+    environment: ${{ github.event.inputs.environment }}
     if: ${{ github.event.inputs.install_pushgateway == 'true' }}
     runs-on: [self-hosted, sha-agent-dev-01]
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials \
+            --resource-group ${{ secrets.AKS_RESOURCE_GROUP }} \
+            --name ${{ secrets.AKS_NAME }} \
+            --overwrite-existing
+
       - run: |
           helm upgrade --install prometheus-pushgateway \
             prometheus/prometheus-pushgateway \
@@ -194,9 +325,28 @@ jobs:
 
   prometheus:
     needs: setup
+    environment: ${{ github.event.inputs.environment }}
     if: ${{ github.event.inputs.install_prometheus == 'true' }}
     runs-on: [self-hosted, sha-agent-dev-01]
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials \
+            --resource-group ${{ secrets.AKS_RESOURCE_GROUP }} \
+            --name ${{ secrets.AKS_NAME }} \
+            --overwrite-existing
+
       - run: |
           helm upgrade --install prometheus \
             prometheus/prometheus \
@@ -205,9 +355,28 @@ jobs:
 
   grafana:
     needs: setup
+    environment: ${{ github.event.inputs.environment }}
     if: ${{ github.event.inputs.install_grafana == 'true' }}
     runs-on: [self-hosted, sha-agent-dev-01]
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials \
+            --resource-group ${{ secrets.AKS_RESOURCE_GROUP }} \
+            --name ${{ secrets.AKS_NAME }} \
+            --overwrite-existing
+
       - run: |
           helm upgrade --install grafana \
             grafana/grafana \
@@ -220,6 +389,24 @@ jobs:
     environment: ${{ github.event.inputs.environment }}
     runs-on: [self-hosted, sha-agent-dev-01]
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials \
+            --resource-group ${{ secrets.AKS_RESOURCE_GROUP }} \
+            --name ${{ secrets.AKS_NAME }} \
+            --overwrite-existing
+
       - run: |
           helm upgrade --install tempo \
             tempo \
@@ -230,9 +417,28 @@ jobs:
 
   kyverno:
     needs: setup
+    environment: ${{ github.event.inputs.environment }}
     if: ${{ github.event.inputs.install_kyverno == 'true' }}
     runs-on: [self-hosted, sha-agent-dev-01]
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials \
+            --resource-group ${{ secrets.AKS_RESOURCE_GROUP }} \
+            --name ${{ secrets.AKS_NAME }} \
+            --overwrite-existing
+
       - run: |
           helm repo add kyverno https://kyverno.github.io/kyverno/
           helm upgrade --install kyverno \
