@@ -1,23 +1,86 @@
+
+deploymentMode: Monolithic
+
 loki:
-  compactor:
-    delete_request_store: azure
-    retention_enabled: true
-  limits_config:
-    ingestion_burst_size_mb: 75
-    ingestion_rate_mb: 50
-    retention_period: 168h
-  querier:
-    max_concurrent: 10
+  commonConfig:
+    replication_factor: 1
+
+  schemaConfig:
+    configs:
+      - from: "2024-04-01"
+        store: tsdb
+        object_store: azure
+        schema: v13
+        index:
+          prefix: loki_index_
+          period: 24h
+
   storage:
+    type: azure
+    azure:
+      accountName: ""
+      accountKey: ""
+      useManagedIdentity: false
+      useFederatedToken: false
+      endpointSuffix: blob.core.windows.net
     bucketNames:
       admin: dev-admin
       chunks: dev-chunks
       ruler: dev-ruler
-querier:
+
+  compactor:
+    delete_request_store: azure
+    retention_enabled: true
+
+  limits_config:
+    ingestion_burst_size_mb: 75
+    ingestion_rate_mb: 50
+    retention_period: 168h
+    volume_enabled: true
+
+  ingester:
+    chunk_encoding: snappy
+
+  querier:
+    max_concurrent: 2
+
+singleBinary:
+  replicas: 1
   resources:
-    limits:
-      cpu: 500m
-      memory: 1Gi
     requests:
       cpu: 200m
       memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+backend:
+  replicas: 0
+read:
+  replicas: 0
+write:
+  replicas: 0
+
+ingester:
+  replicas: 0
+querier:
+  replicas: 0
+queryFrontend:
+  replicas: 0
+queryScheduler:
+  replicas: 0
+distributor:
+  replicas: 0
+compactor:
+  replicas: 0
+indexGateway:
+  replicas: 0
+bloomPlanner:
+  replicas: 0
+bloomBuilder:
+  replicas: 0
+bloomGateway:
+  replicas: 0
+
+minio:
+  enabled: false
