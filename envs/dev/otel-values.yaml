@@ -1,0 +1,43 @@
+config:
+  exporters:
+    prometheus:
+      endpoint: 0.0.0.0:9464
+  processors:
+    batch:
+      timeout: 15s
+    filter/noisy_traces:
+      error_mode: ignore
+      traces:
+        span:
+        - attributes["url.path"] != nil and IsMatch(attributes["url.path"], ".*(/actuator|/swagger|/v3/api-docs).*")
+        - attributes["http.target"] != nil and IsMatch(attributes["http.target"],
+          ".*(/actuator|/swagger|/v3/api-docs).*")
+  service:
+    pipelines:
+      logs:
+        exporters:
+        - otlphttp
+        processors:
+        - memory_limiter
+        - k8sattributes
+        - batch
+        receivers:
+        - otlp
+        - filelog
+      metrics:
+        exporters:
+        - prometheus
+      traces:
+        exporters:
+        - otlp/tempo
+        processors:
+        - memory_limiter
+        - filter/noisy_traces
+        - batch
+        receivers:
+        - otlp
+        - jaeger
+        - zipkin
+
+tolerations:
+  - operator: Exists

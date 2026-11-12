@@ -1,0 +1,48 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: auto-inject-otel-nodejs
+spec:
+  admission: true
+  background: false
+  emitWarning: false
+  rules:
+  - match:
+      any:
+      - resources:
+          kinds:
+          - Deployment
+          namespaces:
+          - dev
+    mutate:
+      patchStrategicMerge:
+        spec:
+          template:
+            metadata:
+              annotations:
+                instrumentation.opentelemetry.io/inject-nodejs: nodejs-instrumentation
+    name: inject-nodejs-instrumentation
+    preconditions:
+      any:
+      - key: '{{ request.object.metadata.name }}'
+        operator: AnyIn
+        value:
+        - managecare-admin
+        - managecare-agents-prelogin
+        - managecare-connect-admin
+        - managecare-connect-patient
+        - managecare-console
+        - managecare-decision-engine
+        - managecare-interpreter
+        - managecare-patient
+        - managecare-pdf-service
+        - managecare-prelogin
+        - managecare-runtime
+        - managecare-testing
+        - managecare-website-compliance
+        - voice-agent-admin
+        - voice-agent-runtime
+        - voice-agent-testing
+        - emr-app
+    skipBackgroundRequests: true
+  validationFailureAction: Audit

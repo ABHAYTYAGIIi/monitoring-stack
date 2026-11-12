@@ -1,0 +1,244 @@
+name: Monitoring Stack Setup Deployment Step by Step
+
+on:
+  workflow_dispatch:
+    inputs:
+      use_self_hosted:
+        description: 'Use self-hosted runner? (Check to use sha-agent-dev-01)'
+        type: boolean
+        default: false
+      environment:
+        description: Select environment
+        required: true
+        type: choice
+        options:
+          - dev
+          - stage
+          - prod
+
+      install_loki:
+        description: Install Loki
+        type: boolean
+        default: false
+
+      install_kyverno:
+        description: Install Kyverno
+        type: boolean
+        default: false
+
+      install_otel:
+        description: Install OpenTelemetry Collector
+        type: boolean
+        default: false
+
+
+      install_otel_operator:
+        description: Install OpenTelemetry Operator
+        type: boolean
+        default: false
+
+      install_node_exporter:
+        description: Install Node Exporter
+        type: boolean
+        default: false
+
+      install_alertmanager:
+        description: Install Alertmanager
+        type: boolean
+        default: false
+
+      install_kube_state_metrics:
+        description: Install Kube State Metrics
+        type: boolean
+        default: false
+
+      install_pushgateway:
+        description: Install Prometheus Pushgateway
+        type: boolean
+        default: false
+
+      install_prometheus:
+        description: Install Prometheus Server
+        type: boolean
+        default: false
+
+      install_grafana:
+        description: Install Grafana
+        type: boolean
+        default: false
+
+      install_tempo:
+        description: Install Tempo
+        type: boolean
+        default: false
+
+jobs:
+  setup:
+    name: AKS Auth & Setup
+    runs-on: ${{ inputs.use_self_hosted && fromJSON('["self-hosted", "sha-agent-dev-01"]') || 'ubuntu-latest' }}
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials \
+            --resource-group ${{ secrets.AKS_RESOURCE_GROUP }} \
+            --name ${{ secrets.AKS_NAME }} \
+            --overwrite-existing
+
+      - name: Ensure monitoring namespace
+        run: |
+          kubectl get ns monitoring || kubectl create ns monitoring
+
+  loki:
+    needs: setup
+    if: ${{ github.event.inputs.install_loki == 'true' }}
+    environment: ${{ github.event.inputs.environment }}
+    runs-on: ${{ inputs.use_self_hosted && fromJSON('["self-hosted", "sha-agent-dev-01"]') || 'ubuntu-latest' }}
+    steps:
+      - run: |
+          # Delete the configmap completely so Helm can recreate it from scratch without any SSA field ownership conflicts
+          kubectl delete configmap loki -n monitoring --ignore-not-found
+          helm upgrade --install loki \
+            loki/loki \
+            -f loki/loki/distributed-values.yaml \
+            -f envs/${{ github.event.inputs.environment }}/loki-values.yaml \
+            --set loki.storage.azure.accountName=${{ secrets.LOKI_STORAGE_NAME }} \
+            --set loki.storage.azure.accountKey=${{ secrets.LOKI_STORAGE_KEY }} \
+            -n monitoring
+
+  otel:
+    needs: setup
+    if: ${{ github.event.inputs.install_otel == 'true' }}
+    runs-on: [self-hosted, sha-agent-dev-01]
+    steps:
+      - run: |
+          helm upgrade --install otel-collector \
+            otel/opentelemetry-collector \
+            -n monitoring \
+            -f otel/opentelemetry-collector/values.yaml \
+            -f envs/${{ github.event.inputs.environment }}/otel-values.yaml
+
+  otel_operator:
+    needs: setup
+    if: ${{ github.event.inputs.install_otel_operator == 'true' }}
+    runs-on: [self-hosted, sha-agent-dev-01]
+    steps:
+      - run: |
+          helm upgrade --install otel-operator \
+            otel/otel-operator \
+            -n monitoring \
+            -f otel/otel-operator/values.yaml
+
+      - name: Apply OpenTelemetry Instrumentation
+        run: |
+          kubectl apply -f envs/${{ github.event.inputs.environment }}/instrumentation.yaml
+
+  node-exporter:
+    needs: setup
+    if: ${{ github.event.inputs.install_node_exporter == 'true' }}
+    runs-on: [self-hosted, sha-agent-dev-01]
+    steps:
+      - run: |
+          helm upgrade --install prometheus-node-exporter \
+            prometheus/prometheus-node-exporter \
+            -n monitoring
+
+  alertmanager:
+    needs: setup
+    if: ${{ github.event.inputs.install_alertmanager == 'true' }}
+    environment: ${{ github.event.inputs.environment }}
+    runs-on: [self-hosted, sha-agent-dev-01]
+    steps:
+      - name: Create Alertmanager Teams Webhook Secret
+        run: |
+          kubectl create secret generic alertmanager-teams-webhook \
+            --from-literal=webhook_url="${{ secrets.MSTEAMS_WEBHOOK_URL }}" \
+            -n monitoring --dry-run=client -o yaml | kubectl apply -f -
+      - name: Deploy Alertmanager
+        run: |
+          helm upgrade --install alertmanager \
+            prometheus/alertmanager \
+            -f envs/${{ github.event.inputs.environment }}/alertmanager-values.yaml \
+            -n monitoring
+
+  kube-state-metrics:
+    needs: setup
+    if: ${{ github.event.inputs.install_kube_state_metrics == 'true' }}
+    runs-on: [self-hosted, sha-agent-dev-01]
+    steps:
+      - run: |
+          helm upgrade --install kube-state-metrics \
+            prometheus/kube-state-metrics \
+            -n monitoring
+
+  pushgateway:
+    needs: setup
+    if: ${{ github.event.inputs.install_pushgateway == 'true' }}
+    runs-on: [self-hosted, sha-agent-dev-01]
+    steps:
+      - run: |
+          helm upgrade --install prometheus-pushgateway \
+            prometheus/prometheus-pushgateway \
+            -n monitoring
+
+  prometheus:
+    needs: setup
+    if: ${{ github.event.inputs.install_prometheus == 'true' }}
+    runs-on: [self-hosted, sha-agent-dev-01]
+    steps:
+      - run: |
+          helm upgrade --install prometheus \
+            prometheus/prometheus \
+            -f envs/${{ github.event.inputs.environment }}/prometheus-values.yaml \
+            -n monitoring
+
+  grafana:
+    needs: setup
+    if: ${{ github.event.inputs.install_grafana == 'true' }}
+    runs-on: [self-hosted, sha-agent-dev-01]
+    steps:
+      - run: |
+          helm upgrade --install grafana \
+            grafana/grafana \
+            -f envs/${{ github.event.inputs.environment }}/grafana-values.yaml \
+            -n monitoring
+
+  tempo:
+    needs: setup
+    if: ${{ github.event.inputs.install_tempo == 'true' }}
+    environment: ${{ github.event.inputs.environment }}
+    runs-on: [self-hosted, sha-agent-dev-01]
+    steps:
+      - run: |
+          helm upgrade --install tempo \
+            tempo \
+            -f envs/${{ github.event.inputs.environment }}/tempo-values.yaml \
+            --set tempo.storage.trace.azure.storage_account_name=${{ secrets.TEMPO_STORAGE_NAME }} \
+            --set tempo.storage.trace.azure.storage_account_key=${{ secrets.TEMPO_STORAGE_KEY }} \
+            -n monitoring
+
+  kyverno:
+    needs: setup
+    if: ${{ github.event.inputs.install_kyverno == 'true' }}
+    runs-on: [self-hosted, sha-agent-dev-01]
+    steps:
+      - run: |
+          helm repo add kyverno https://kyverno.github.io/kyverno/
+          helm upgrade --install kyverno \
+            kyverno/kyverno \
+            -n kyverno --create-namespace --version 3.8.2 \
+            -f envs/${{ github.event.inputs.environment }}/kyverno-values.yaml
+      - name: Apply Kyverno Auto-Inject Policies
+        run: |
+          kubectl apply -f envs/${{ github.event.inputs.environment }}/kyverno-policies/

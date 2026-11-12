@@ -1,0 +1,17 @@
+tempo:
+  retention: 168h
+  extraArgs:
+    -config.expand-env: "true"
+  storage:
+    trace:
+      backend: azure
+      azure:
+        storage_account_name: ""
+        storage_account_key: ""
+        container_name: dev-tempo
+  compactor:
+    compaction:
+      block_retention: 168h
+  metricsGenerator:
+    enabled: true
+    remoteWriteUrl: "http://prometheus-server.monitoring.svc.cluster.local:80/api/v1/write"

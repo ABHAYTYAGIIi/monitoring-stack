@@ -1,0 +1,37 @@
+envValueFrom:
+  GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET:
+    secretKeyRef:
+      name: grafana-sso-secret
+      key: client-secret
+
+grafana.ini:
+  auth:
+    disable_login_form: false
+  auth.generic_oauth:
+    enabled: true
+    name: "Microsoft Entra ID"
+    allow_sign_up: true
+    auto_login: false
+    client_id: "e2aafdf3-cccd-44e6-900e-9889216e9398"
+    client_secret: "$__env{GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET}"
+    scopes: "openid email profile"
+    auth_url: "https://login.microsoftonline.com/6e342ec1-2257-4d04-92c4-5c99d57e8208/oauth2/v2.0/authorize"
+    token_url: "https://login.microsoftonline.com/6e342ec1-2257-4d04-92c4-5c99d57e8208/oauth2/v2.0/token"
+    api_url: "https://graph.microsoft.com/v1.0/me"
+    use_pkce: true
+    use_refresh_token: true
+  server:
+    domain: dev-tools.smartslot.ai
+    root_url: "https://dev-tools.smartslot.ai/grafana/"
+    serve_from_sub_path: true
+  users:
+    auto_assign_org: true
+    auto_assign_org_role: Admin
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 1Gi
+  requests:
+    cpu: 100m
+    memory: 256Mi
