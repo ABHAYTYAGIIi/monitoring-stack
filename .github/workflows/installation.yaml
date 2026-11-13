@@ -136,7 +136,7 @@ jobs:
     steps:
       - run: |
           helm upgrade --install otel-operator \
-            otel/otel-operator \
+            otel/oteltelemetry-operator \
             -n monitoring \
             -f otel/oteltelemetry-operator/values.yaml
 
