@@ -1,4 +1,3 @@
-
 deploymentMode: Monolithic
 
 loki:
@@ -81,3 +80,12 @@ bloomBuilder:
   replicas: 0
 bloomGateway:
   replicas: 0
+
+
+chunksCache:
+  enabled: true
+  allocatedMemory: 512
+
+resultsCache:
+  enabled: true
+  allocatedMemory: 128
