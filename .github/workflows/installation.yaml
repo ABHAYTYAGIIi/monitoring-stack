@@ -138,7 +138,7 @@ jobs:
           helm upgrade --install otel-operator \
             otel/otel-operator \
             -n monitoring \
-            -f otel/otel-operator/values.yaml
+            -f otel/oteltelemetry-operator/values.yaml
 
       - name: Apply OpenTelemetry Instrumentation
         run: |
